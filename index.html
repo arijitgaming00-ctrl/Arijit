@@ -1,1 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kirana Store Billing</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif}
+    body{background:#f5f7fb;color:#212529;min-height:100vh;display:flex;flex-direction:column}
+    .app-container{max-width:500px;margin:0 auto;background:#fff;min-height:100vh;padding:15px}
+    .card-main{background:linear-gradient(135deg,#004e92,#000428);color:#fff;padding:20px;border-radius:16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;cursor:pointer}
+    .options{display:flex;justify-content:space-between;margin-bottom:20px}
+    .option-box{flex:1;margin:0 5px;padding:15px;background:#f8f9fa;border-radius:12px;text-align:center;font-size:14px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+    .grid-menu{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+    .grid-item{background:#fff;padding:15px;border-radius:12px;text-align:center;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,0.1);cursor:pointer}
+    .grid-item i{font-size:22px;margin-bottom:6px;color:#3f37c9}
+    .page{display:none}
+    .page.active{display:block;padding:0}
+    .back-btn{margin:15px;display:inline-block;background:#004e92;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;cursor:pointer}
+    .bill-top{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#fff;border-bottom:1px solid #ddd}
+    .bill-tab{background:#002855;color:#fff;padding:6px 14px;border-radius:20px;font-weight:600}
+    .bill-total{background:linear-gradient(90deg,#0072ff,#004e92);color:#fff;padding:10px 15px;border-radius:12px;text-align:right}
+    .bill-customer{color:#28a745;font-weight:600;cursor:pointer}
+    .bill-row{display:flex;justify-content:space-between;align-items:center;padding:10px}
+    .toggle-group{display:flex;gap:10px}
+    .toggle-btn{padding:6px 12px;border:1px solid #ccc;border-radius:8px;cursor:pointer}
+    .toggle-btn.active{background:#004e92;color:#fff}
+    .date-box{background:#002855;color:#fff;padding:6px 10px;margin:10px;border-radius:6px;font-size:14px;text-align:center}
+    .item-list{min-height:150px;padding:10px}
+    .item{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee}
+    .item-details{flex:1;display:flex;flex-direction:column}
+    .item-name{font-weight:500}
+    .item-price{font-size:12px;color:#666}
+    .item-quantity{display:flex;align-items:center;gap:5px;margin-top:3px}
+    .quantity-btn{width:20px;height:20px;border-radius:50%;background:#f0f0f0;display:flex;justify-content:center;align-items:center;cursor:pointer;font-size:12px}
+    .quantity-input{width:30px;text-align:center;border:1px solid #ddd;border-radius:4px;padding:2px}
+    .item-total{font-weight:600}
+    .item-actions{display:flex;gap:5px}
+    .item-action-btn{color:#004e92;cursor:pointer}
+    .action-row{display:flex;justify-content:space-between;align-items:center;padding:10px}
+    .quick-add{background:#a58d63;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer}
+    .create-bill{background:#28a745;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer}
+    .search-bar{display:flex;align-items:center;padding:10px}
+    .search-bar input{flex:1;padding:10px;border:1px solid #ccc;border-radius:8px 0 0 8px}
+    .search-bar button{padding:10px;border:none;background:#004e92;color:#fff;border-radius:0 8px 8px 0;cursor:pointer}
 
+    /* Quick Add Modal */
+    .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:1000}
+    .modal-content{background:#fff;padding:20px;border-radius:12px;width:90%;max-width:400px}
+    .modal-content h2{margin-bottom:15px;font-size:18px;text-align:center}
+    .form-group{margin-bottom:12px}
+    .form-group label{display:block;margin-bottom:6px;font-size:14px}
+    .form-group input,.form-group select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px}
+    .modal-actions{display:flex;justify-content:space-between;margin-top:15px}
+    .btn-cancel{background:#dc3545;color:#fff;padding:10px 18px;border:none;border-radius:8px;cursor:pointer}
+    .btn-done{background:#28a745;color:#fff;padding:10px 18px;border:none;border-radius:8px;cursor:pointer}
+    .scanner-container{position:relative;margin-top:10px}
+    video{width:100%;border-radius:8px}
+    .scanner-actions{display:flex;justify-content:center;margin-top:10px}
+    .scanner-btn{background:#004e92;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;margin:0 5px}
+    
+    /* Stock Page Styles */
+    .stock-header{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#fff;border-bottom:1px solid #ddd}
+    .stock-search{display:flex;align-items:center;padding:10px;background:#fff;border-bottom:1px solid #ddd}
+    .stock-search input{flex:1;padding:10px;border:1px solid #ccc;border-radius:8px}
+    .stock-search button{padding:10px;margin-left:5px;border:none;background:#004e92;color:#fff;border-radius:8px;cursor:pointer}
+    .stock-filters{display:flex;justify-content:space-between;padding:10px;background:#fff;border-bottom:1px solid #ddd}
+    .filter-btn{padding:6px 12px;border:1px solid #ccc;border-radius:8px;cursor:pointer;font-size:12px}
+    .filter-btn.active{background:#004e92;color:#fff}
+    .stock-list{padding:10px}
+    .stock-item{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;align-items:center}
+    .stock-info{flex:1}
+    .stock-name{font-weight:600}
+    .stock-details{font-size:12px;color:#666}
+    .stock-qty{padding:4px 8px;background:#f8f9fa;border-radius:4px;font-weight:600}
+    .stock-qty.low{background:#ffcccc;color:#dc3545}
+    .stock-actions{display:flex;gap:5px}
+    .stock-action-btn{padding:6px;border-radius:4px;cursor:pointer}
+    .stock-action-edit{background:#004e92;color:#fff}
+    .stock-action-delete{background:#dc3545;color:#fff}
+    .stock-summary{display:flex;justify-content:space-between;padding:10px;background:#fff;border-top:1px solid #ddd;margin-top:10px}
+    .summary-item{text-align:center}
+    .summary-value{font-size:18px;font-weight:600}
+    .summary-label{font-size:12px;color:#666}
+    
+    /* Add Stock Modal */
+    .add-stock-modal .modal-content{max-width:500px}
+    .stock-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    
+    /* Search Results */
+    .search-results{position:absolute;background:#fff;width:calc(100% - 20px);max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 8px rgba(0,0,0,0.1);border-radius:0 0 8px 8px;display:none}
+    .search-result-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+    .search-result-item:hover{background:#f5f7fb}
+    .search-result-name{font-weight:600}
+    .search-result-details{font-size:12px;color:#666}
+    
+    /* Edit Item Modal */
+    .edit-modal .modal-content{max-width:400px}
+    
+    /* Barcode Scanner on Billing Page */
+    .barcode-scanner-modal .modal-content {
+      max-width: 450px;
+    }
+    .scanner-instructions {
+      text-align: center;
+      margin-bottom: 15px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    /* New styles for barcode scanning feedback */
+    .scanner-feedback {
+      text-align: center;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      display: none;
+    }
+    .scanner-success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .scanner-error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .scanner-loading {
+      background: #cce5ff;
+      color: #004085;
+    }
+    .scanner-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.7);
+      z-index: 10;
+    }
+    .scanner-target {
+      width: 250px;
+      height: 150px;
+      border: 4px solid #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.3);
+    }
+    .scanner-beep {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Homepage -->
+    <div id="home" class="page active">
+      <div class="card-main" onclick="openPage('newbill')">
+        <div>
+          <h2>New bill</h2>
+          <p>Click here to create bill</p>
+        </div>
+        <i class="fas fa-shopping-cart fa-2x"></i>
+      </div>
+      <div class="options">
+        <div class="option-box" onclick="openPage('purchase')"><i class="fas fa-undo-alt"></i> Purchase/Returns</div>
+        <div class="option-box" onclick="openPage('addproduct')"><i class="fas fa-plus-square"></i> Add Products</div>
+      </div>
+      <div class="grid-menu">
+        <div class="grid-item" onclick="openPage('stock')"><i class="fas fa-box"></i><div>Stock</div></div>
+        <div class="grid-item" onclick="openPage('suppliers')"><i class="fas fa-truck"></i><div>Suppliers</div></div>
+        <div class="grid-item" onclick="openPage('customers')"><i class="fas fa-user"></i><div>Customers</div></div>
+        <div class="grid-item" onclick="openPage('orders')"><i class="fas fa-file-alt"></i><div>Orders</div></div>
+        <div class="grid-item" onclick="openPage('expenses')"><i class="fas fa-receipt"></i><div>Expenses</div></div>
+        <div class="grid-item" onclick="openPage('printer')"><i class="fas fa-print"></i><div>Printer</div></div>
+        <div class="grid-item" onclick="openPage('reports')"><i class="fas fa-chart-line"></i><div>Reports</div></div>
+      </div>
+    </div>
+
+    <!-- New Bill Page -->
+    <div id="newbill" class="page">
+      <div class="bill-top">
+        <div class="bill-tab">Bill 1</div>
+        <div class="bill-total">Total (₹)<br><span id="total">0</span></div>
+      </div>
+      <div class="bill-row">
+        <div class="bill-customer" onclick="alert('Add customer')">+ Add Customer</div>
+        <select id="paymentMode">
+          <option>Cash</option>
+          <option>Card</option>
+          <option>UPI</option>
+        </select>
+      </div>
+      <div class="bill-row">
+        <div class="toggle-group">
+          <div class="toggle-btn active" id="retailBtn" onclick="setMode('retail')">Retail</div>
+          <div class="toggle-btn" id="wholesaleBtn" onclick="setMode('wholesale')">Wholesale</div>
+        </div>
+        <button class="scanner-btn" onclick="openBarcodeScanner()"><i class="fas fa-barcode"></i> Scan Barcode</button>
+      </div>
+      <div class="date-box">Date: <span id="billDate"></span></div>
+      <div class="item-list" id="itemList"></div>
+      <div class="action-row">
+        <button class="quick-add" onclick="openQuickAdd()">Quick add</button>
+        <button class="create-bill" onclick="createBill()">Create bill</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchBox" placeholder="Search by name or barcode" onkeyup="searchProduct(event)" onfocus="showSearchResults()">
+        <button onclick="scanItem()"><i class="fas fa-barcode"></i> Scan</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+      <div class="back-btn" onclick="goHome()">⬅ Back</div>
+    </div>
+
+    <!-- Stock Page -->
+    <div id="stock" class="page">
+      <div class="stock-header">
+        <h1>Stock Management</h1>
+        <button class="quick-add" onclick="openAddStockModal()">Add Stock</button>
+      </div>
+      <div class="stock-search">
+        <input type="text" id="stockSearch" placeholder="Search products...">
+        <button onclick="searchStock()"><i class="fas fa-search"></i></button>
+      </div>
+      <div class="stock-filters">
+        <div class="filter-btn active" onclick="setStockFilter('all')">All</div>
+        <div class="filter-btn" onclick="setStockFilter('low')">Low Stock</div>
+        <div class="filter-btn" onclick="setStockFilter('category')">By Category</div>
+        <div class="filter-btn" onclick="setStockFilter('barcode')">By Barcode</div>
+      </div>
+      <div class="stock-list" id="stockList">
+        <!-- Stock items will be populated here -->
+      </div>
+      <div class="stock-summary">
+        <div class="summary-item">
+          <div class="summary-value" id="totalItems">0</div>
+          <div class="summary-label">Total Items</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-value" id="outOfStock">0</div>
+          <div class="summary-label">Out of Stock</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-value" id="lowStock">0</div>
+          <div class="summary-label">Low Stock</div>
+        </div>
+      </div>
+      <div class="back-btn" onclick="goHome()">⬅ Back</div>
+    </div>
+
+    <!-- Other Pages -->
+    <div id="purchase" class="page"><h1>Purchase/Returns</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="addproduct" class="page"><h1>Add Products</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="suppliers" class="page"><h1>Suppliers</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="customers" class="page"><h1>Customers</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="orders" class="page"><h1>Orders</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="expenses" class="page"><h1>Expenses</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="printer" class="page"><h1>Printer</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+    <div id="reports" class="page"><h1>Reports</h1><div class="back-btn" onclick="goHome()">⬅ Back</div></div>
+  </div>
+
+  <!-- Quick Add Modal -->
+  <div id="quickAddModal" class="modal">
+    <div class="modal-content">
+      <h2>Quick Add Product</h2>
+      <div class="form-group">
+        <label>Barcode</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="qaBarcode" style="flex: 1;">
+          <button onclick="startScanner()" class="scanner-btn">Scan</button>
+        </div>
+        <div class="scanner-container" id="scannerContainer" style="display: none;">
+          <video id="preview"></video>
+          <div class="scanner-actions">
+            <button class="scanner-btn" onclick="stopScanner()">Stop Scanner</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label>Product Name</label><input type="text" id="qaName"></div>
+      <div class="form-group"><label>Price/Piece (MRP)</label><input type="number" id="qaMRP"></div>
+      <div class="form-group"><label>Retail/Piece (SP)</label><input type="number" id="qaSP"></div>
+      <div class="form-group"><label>Quantity</label><input type="number" id="qaQty" value="1"></div>
+      <div class="form-group"><label>Additional Details</label><input type="text" id="qaDetails"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeQuickAdd()">Cancel</button>
+        <button class="btn-done" onclick="saveQuickAdd()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Stock Modal -->
+  <div id="addStockModal" class="modal">
+    <div class="modal-content add-stock-modal">
+      <h2>Add New Stock Item</h2>
+      <div class="stock-form-grid">
+        <div class="form-group"><label>Product Name</label><input type="text" id="stockName"></div>
+        <div class="form-group"><label>Barcode</label><input type="text" id="stockBarcode"></div>
+        <div class="form-group"><label>Category</label>
+          <select id="stockCategory">
+            <option>Grocery</option>
+            <option>Snacks</option>
+            <option>Beverages</option>
+            <option>Personal Care</option>
+            <option>Cleaning</option>
+            <option>Others</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Quantity</label><input type="number" id="stockQty" value="0"></div>
+        <div class="form-group"><label>Cost Price</label><input type="number" id="stockCost" step="0.01"></div>
+        <div class="form-group"><label>Selling Price</label><input type="number" id="stockPrice" step="0.01"></div>
+        <div class="form-group"><label>Low Stock Alert</label><input type="number" id="stockAlert" value="5"></div>
+        <div class="form-group"><label>Supplier</label>
+          <select id="stockSupplier">
+            <option>Local Supplier</option>
+            <option>Wholesale Market</option>
+            <option>Direct Company</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="stockDesc" rows="2"></textarea></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAddStockModal()">Cancel</button>
+        <button class="btn-done" onclick="saveStockItem()">Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Item Modal -->
+  <div id="editItemModal" class="modal edit-modal">
+    <div class="modal-content">
+      <h2>Edit Bill Item</h2>
+      <div class="form-group">
+        <label>Product Name</label>
+        <input type="text" id="editItemName" readonly>
+      </div>
+      <div class="form-group">
+        <label>Price per Unit</label>
+        <input type="number" id="editItemPrice" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" id="editItemQty" min="1">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeEditItemModal()">Cancel</button>
+        <button class="btn-done" onclick="saveEditedItem()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barcode Scanner Modal for Billing Page -->
+  <div id="barcodeScannerModal" class="modal barcode-scanner-modal">
+    <div class="modal-content">
+      <h2>Barcode Scanner</h2>
+      <div class="scanner-instructions">
+        Point the camera at the barcode to scan
+      </div>
+      
+      <div class="scanner-feedback scanner-loading" id="scannerLoading">
+        <i class="fas fa-spinner fa-spin"></i> Starting scanner...
+      </div>
+      <div class="scanner-feedback scanner-success" id="scannerSuccess">
+        <i class="fas fa-check-circle"></i> Product added successfully!
+      </div>
+      <div class="scanner-feedback scanner-error" id="scannerError">
+        <i class="fas fa-exclamation-circle"></i> <span id="errorMessage">Product not found!</span>
+      </div>
+      
+      <div class="scanner-container">
+        <div id="scannerOverlay" class="scanner-overlay" style="display: none;">
+          <div class="scanner-target"></div>
+        </div>
+        <video id="barcodePreview"></video>
+      </div>
+      
+      <div class="scanner-actions">
+        <button class="scanner-btn" onclick="switchCamera()"><i class="fas fa-camera-rotate"></i> Switch Camera</button>
+        <button class="scanner-btn" onclick="toggleFlash()"><i class="fas fa-lightbulb"></i> Flash</button>
+        <button class="scanner-btn" onclick="stopBarcodeScanner()">Stop Scanner</button>
+      </div>
+      
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeBarcodeScanner()">Close</button>
+      </div>
+    </div>বই
+  </div>
+
+  <!-- Hidden audio element for beep sound -->
+  <audio id="scannerBeep" class="scanner-beep" preload="auto">
+    <source src="https://assets.mixkit.co/sfx/preview/mixkit-beep-validate-code-2580.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    let items = [];
+    let stockItems = [
+      {id: 1, name: "Maggi Noodles", barcode: "8901001001001", category: "Snacks", quantity: 25, cost: 12.5, price: 15, alert: 10,
